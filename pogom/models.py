@@ -539,19 +539,29 @@ def parse_map(args, map_dict, step_location, db_update_queue, wh_update_queue):
         for f in cell.get('forts', []):
             if config['parse_pokestops'] and f.get('type') == 1:  # Pokestops
                 if 'active_fort_modifier' in f:
+                    lure_info = f.get('lure_info')
                     lure_expiration = datetime.utcfromtimestamp(
                         f['last_modified_timestamp_ms'] / 1000.0) + timedelta(minutes=30)
                     active_fort_modifier = f['active_fort_modifier']
-                    if args.webhooks and args.webhook_updates_only:
-                        wh_update_queue.put(('pokestop', {
-                            'pokestop_id': b64encode(str(f['id'])),
-                            'enabled': f['enabled'],
-                            'latitude': f['latitude'],
-                            'longitude': f['longitude'],
-                            'last_modified_time': f['last_modified_timestamp_ms'],
-                            'lure_expiration': calendar.timegm(lure_expiration.timetuple()),
-                            'active_fort_modifier': active_fort_modifier
-                        }))
+                    
+                    if lure_info is not None:
+                        pokemons[lure_info['encounter_id']] = {
+                            'encounter_id': b64encode(str(lure_info['encounter_id'])),
+                            'spawnpoint_id': 'lure',#p['spawn_point_id'],
+                            'pokemon_id': lure_info['active_pokemon_id'],
+                            'latitude': f['latitude'] + 0.00005,
+                            'longitude': f['longitude'] + 0.00005,
+                            'disappear_time': datetime.utcfromtimestamp(lure_info['lure_expires_timestamp_ms']/1000)
+                        }
+                        print pokemons[lure_info['encounter_id']]
+
+                     webhook_data = {
+                        'latitude': f['latitude'],
+                        'longitude': f['longitude'],
+                        'last_modified_time': f['last_modified_timestamp_ms'],
+                        'active_fort_modifier': active_fort_modifier
+                    }
+                    send_to_webhook('pokestop', webhook_data)
                 else:
                     lure_expiration, active_fort_modifier = None, None
 
